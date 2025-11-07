@@ -15,4 +15,4 @@ ignorePorts = false
 
 [agent]
 expertMode = true
-integrations = ["google-calendar:1.0.0"]
+integrations = ["google-calendar:1.0.0", "javascript_anthropic_ai_integrations:1.0.0"]
