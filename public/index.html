@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Planner - Smart Task Scheduling</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 AI Planner</h1>
+            <p class="subtitle">Break down tasks and schedule them intelligently</p>
+        </header>
+
+        <main>
+            <!-- Task Input Section -->
+            <section class="card">
+                <h2>Create New Task</h2>
+                <form id="taskForm">
+                    <div class="form-group">
+                        <label for="taskTitle">Task Title</label>
+                        <input type="text" id="taskTitle" placeholder="e.g., Complete project proposal" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskDescription">Task Description</label>
+                        <textarea id="taskDescription" rows="4" placeholder="Describe your task in detail..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="imageUpload">Upload Image (Optional - for OCR)</label>
+                        <div class="file-upload">
+                            <input type="file" id="imageUpload" accept="image/*">
+                            <button type="button" class="btn-secondary" id="scanImageBtn" disabled>
+                                📷 Scan Image for Text
+                            </button>
+                        </div>
+                        <div id="ocrResult" class="ocr-result"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Subtask Generation Method</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="subtaskMethod" value="ai" checked>
+                                <span>🤖 AI-Generated Breakdown</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="subtaskMethod" value="manual">
+                                <span>✏️ Manual Entry</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="manualSubtasks" class="manual-subtasks hidden">
+                        <h3>Manual Subtasks</h3>
+                        <div id="subtasksList"></div>
+                        <button type="button" class="btn-secondary" id="addSubtaskBtn">+ Add Subtask</button>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="submitBtn">
+                        Generate Plan & Schedule
+                    </button>
+                </form>
+            </section>
+
+            <!-- Results Section -->
+            <section class="card" id="resultsSection" style="display: none;">
+                <h2>📋 Task Breakdown</h2>
+                <div id="subtasksResult"></div>
+
+                <h2>📅 Schedule Preview</h2>
+                <div id="schedulePreview"></div>
+
+                <div class="action-buttons">
+                    <button class="btn-primary" id="addToCalendarBtn">
+                        📅 Add to Google Calendar
+                    </button>
+                    <button class="btn-secondary" id="resetBtn">
+                        🔄 Create New Task
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="loading-spinner hidden">
+                <div class="spinner"></div>
+                <p>Processing your task...</p>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="success-message hidden">
+                <p>✅ Events successfully added to Google Calendar!</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
