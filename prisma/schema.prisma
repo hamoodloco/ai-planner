@@ -1,0 +1,46 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  manual      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  subtasks    Subtask[]
+  events      Event[]
+}
+
+model Subtask {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  duration    Int      // Duration in minutes (25-60)
+  order       Int      // Order in the sequence
+  createdAt   DateTime @default(now())
+}
+
+model Event {
+  id              String   @id @default(uuid())
+  taskId          String
+  task            Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  subtaskId       String?
+  googleEventId   String?  // Google Calendar event ID
+  title           String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  bufferMinutes   Int      @default(10)
+  createdAt       DateTime @default(now())
+}
