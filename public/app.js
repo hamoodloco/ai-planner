@@ -1,305 +1,357 @@
-// Frontend JavaScript for AI Planner App
+// AI Planner - Frontend JavaScript (UI/UX v2)
 
+// ===== STATE MANAGEMENT =====
 let currentTask = null;
 let currentSubtasks = [];
 let currentSchedule = [];
+let scheduledEvents = [];
+let unscheduledTasks = [];
 
-// DOM Elements
-const taskForm = document.getElementById('taskForm');
-const taskTitle = document.getElementById('taskTitle');
-const taskDescription = document.getElementById('taskDescription');
-const imageUpload = document.getElementById('imageUpload');
-const scanImageBtn = document.getElementById('scanImageBtn');
-const ocrResult = document.getElementById('ocrResult');
-const manualSubtasks = document.getElementById('manualSubtasks');
-const subtasksList = document.getElementById('subtasksList');
-const addSubtaskBtn = document.getElementById('addSubtaskBtn');
-const resultsSection = document.getElementById('resultsSection');
-const subtasksResult = document.getElementById('subtasksResult');
-const schedulePreview = document.getElementById('schedulePreview');
-const loadingSpinner = document.getElementById('loadingSpinner');
-const successMessage = document.getElementById('successMessage');
-const addToCalendarBtn = document.getElementById('addToCalendarBtn');
-const resetBtn = document.getElementById('resetBtn');
+// ===== DOM ELEMENTS =====
+const taskForm = document.getElementById("taskForm");
+const taskTitle = document.getElementById("taskTitle");
+const taskDescription = document.getElementById("taskDescription");
+const imageUpload = document.getElementById("imageUpload");
+const ocrResult = document.getElementById("ocrResult");
+const taskPool = document.getElementById("taskPool");
+const timelineGrid = document.getElementById("timelineGrid");
+const loadingSpinner = document.getElementById("loadingSpinner");
+const successMessage = document.getElementById("successMessage");
+const voiceToggle = document.getElementById("voiceToggle");
+const voiceIndicator = document.getElementById("voiceIndicator");
+const addToCalendarBtn = document.getElementById("addToCalendarBtn");
 
-// Radio buttons for subtask method
-const subtaskMethodRadios = document.querySelectorAll('input[name="subtaskMethod"]');
-
-// Toggle manual subtasks section
-subtaskMethodRadios.forEach(radio => {
-    radio.addEventListener('change', (e) => {
-        if (e.target.value === 'manual') {
-            manualSubtasks.classList.remove('hidden');
-            if (subtasksList.children.length === 0) {
-                addManualSubtask();
-            }
-        } else {
-            manualSubtasks.classList.add('hidden');
-        }
-    });
+// ===== INITIALIZE APP =====
+document.addEventListener("DOMContentLoaded", () => {
+    initializeTimeline();
+    attachEventListeners();
 });
 
-// Enable scan button when image is uploaded
-imageUpload.addEventListener('change', (e) => {
-    scanImageBtn.disabled = !e.target.files.length;
-});
+// ===== TIMELINE GENERATION =====
+function initializeTimeline() {
+    const startHour = 8; // 8 AM
+    const endHour = 20; // 8 PM
 
-// Scan image for OCR
-scanImageBtn.addEventListener('click', async () => {
-    const file = imageUpload.files[0];
-    if (!file) return;
+    for (let hour = startHour; hour < endHour; hour++) {
+        const timeLabel = document.createElement("div");
+        timeLabel.className = "time-label";
+        timeLabel.textContent = formatHour(hour);
 
-    scanImageBtn.disabled = true;
-    scanImageBtn.textContent = '🔄 Processing...';
+        const timeSlot = document.createElement("div");
+        timeSlot.className = "time-slot";
+        timeSlot.dataset.hour = hour;
+        timeSlot.dataset.time = `${hour}:00`;
 
-    const formData = new FormData();
-    formData.append('image', file);
+        // Make time slots droppable
+        timeSlot.addEventListener("dragover", handleDragOver);
+        timeSlot.addEventListener("drop", handleDrop);
+        timeSlot.addEventListener("dragleave", handleDragLeave);
 
-    try {
-        const response = await fetch('/api/ocr', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            ocrResult.innerHTML = `<strong>📝 Extracted Text:</strong><br>${data.text}`;
-            ocrResult.classList.add('show');
-            
-            // Append to description
-            if (taskDescription.value) {
-                taskDescription.value += '\n\n' + data.text;
-            } else {
-                taskDescription.value = data.text;
-            }
-        } else {
-            alert('Error processing image: ' + data.error);
-        }
-    } catch (error) {
-        alert('Error scanning image: ' + error.message);
-    } finally {
-        scanImageBtn.disabled = false;
-        scanImageBtn.textContent = '📷 Scan Image for Text';
+        timelineGrid.appendChild(timeLabel);
+        timelineGrid.appendChild(timeSlot);
     }
-});
-
-// Add manual subtask
-addSubtaskBtn.addEventListener('click', addManualSubtask);
-
-function addManualSubtask() {
-    const subtaskItem = document.createElement('div');
-    subtaskItem.className = 'subtask-item';
-    subtaskItem.innerHTML = `
-        <div class="subtask-header">
-            <strong>Subtask ${subtasksList.children.length + 1}</strong>
-            <button type="button" class="remove-subtask" onclick="this.parentElement.parentElement.remove()">Remove</button>
-        </div>
-        <label>Title:</label>
-        <input type="text" class="subtask-title" placeholder="Subtask title" required>
-        <label style="margin-top: 0.5rem;">Duration (minutes):</label>
-        <select class="subtask-duration">
-            <option value="25">25 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="40">40 minutes</option>
-            <option value="45">45 minutes</option>
-            <option value="50">50 minutes</option>
-            <option value="60">60 minutes</option>
-        </select>
-    `;
-    subtasksList.appendChild(subtaskItem);
 }
 
-// Form submission
-taskForm.addEventListener('submit', async (e) => {
+function formatHour(hour) {
+    const period = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${displayHour}:00 ${period}`;
+}
+
+// ===== EVENT LISTENERS =====
+function attachEventListeners() {
+    // Task form submission
+    taskForm.addEventListener("submit", handleTaskSubmit);
+
+    // Image upload for OCR
+    imageUpload.addEventListener("change", handleImageUpload);
+
+    // Voice toggle (stub)
+    voiceToggle.addEventListener("click", handleVoiceToggle);
+
+    // Calendar sync button
+    addToCalendarBtn.addEventListener("click", syncToCalendar);
+}
+
+// ===== TASK SUBMISSION =====
+async function handleTaskSubmit(e) {
     e.preventDefault();
-    
-    const method = document.querySelector('input[name="subtaskMethod"]:checked').value;
+
     const title = taskTitle.value.trim();
     const description = taskDescription.value.trim();
+    const method = document.querySelector(
+        'input[name="subtaskMethod"]:checked',
+    ).value;
 
-    if (!title) {
-        alert('Please enter a task title');
-        return;
-    }
+    if (!title) return;
 
-    loadingSpinner.classList.remove('hidden');
-    resultsSection.style.display = 'none';
-    successMessage.classList.add('hidden');
+    showLoading();
 
     try {
-        let subtasks = [];
-
-        if (method === 'manual') {
-            // Collect manual subtasks
-            const subtaskItems = subtasksList.querySelectorAll('.subtask-item');
-            if (subtaskItems.length === 0) {
-                alert('Please add at least one subtask');
-                loadingSpinner.classList.add('hidden');
-                return;
-            }
-
-            subtaskItems.forEach((item, index) => {
-                const title = item.querySelector('.subtask-title').value.trim();
-                const duration = parseInt(item.querySelector('.subtask-duration').value);
-                if (title) {
-                    subtasks.push({
-                        title,
-                        duration,
-                        order: index
-                    });
-                }
-            });
-        } else {
+        if (method === "ai") {
             // AI-generated breakdown
-            const response = await fetch('/api/ai-breakdown', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ title, description })
+            const response = await fetch("/ingest/text", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title, description }),
             });
 
             const data = await response.json();
-            
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to generate AI breakdown');
+
+            if (data.success) {
+                currentTask = { title, description };
+                currentSubtasks = data.subtasks || [];
+                currentSchedule = data.schedule || [];
+
+                renderUnscheduledTasks();
+                addToCalendarBtn.disabled = false;
+            } else {
+                alert("Error: " + (data.error || "Failed to generate plan"));
             }
+        } else {
+            // Manual entry (simplified for now)
+            currentTask = { title, description };
+            currentSubtasks = [
+                {
+                    title: title,
+                    duration: 30,
+                    description: description,
+                },
+            ];
+            currentSchedule = [];
 
-            subtasks = data.subtasks;
+            renderUnscheduledTasks();
+            addToCalendarBtn.disabled = false;
         }
-
-        currentSubtasks = subtasks;
-
-        // Display subtasks
-        displaySubtasks(subtasks);
-
-        // Generate schedule
-        const scheduleResponse = await fetch('/api/schedule', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                title,
-                description,
-                subtasks,
-                manual: method === 'manual'
-            })
-        });
-
-        const scheduleData = await scheduleResponse.json();
-        
-        if (!scheduleData.success) {
-            throw new Error(scheduleData.error || 'Failed to create schedule');
-        }
-
-        currentTask = scheduleData.task;
-        currentSchedule = scheduleData.schedule;
-
-        // Display schedule
-        displaySchedule(scheduleData.schedule);
-
-        resultsSection.style.display = 'block';
-        resultsSection.scrollIntoView({ behavior: 'smooth' });
-
     } catch (error) {
-        alert('Error: ' + error.message);
+        console.error("Task submission error:", error);
+        alert("Failed to process task. Please try again.");
     } finally {
-        loadingSpinner.classList.add('hidden');
+        hideLoading();
     }
-});
-
-// Display subtasks
-function displaySubtasks(subtasks) {
-    subtasksResult.innerHTML = subtasks.map((subtask, index) => `
-        <div class="subtask-card">
-            <h4>${index + 1}. ${subtask.title}</h4>
-            ${subtask.description ? `<p>${subtask.description}</p>` : ''}
-            <span class="duration-badge">⏱️ ${subtask.duration} minutes</span>
-        </div>
-    `).join('');
 }
 
-// Display schedule
-function displaySchedule(schedule) {
-    schedulePreview.innerHTML = schedule.map(event => {
-        const start = new Date(event.startTime);
-        const end = new Date(event.endTime);
-        
-        return `
-            <div class="schedule-item">
-                <div>
-                    <div class="title">${event.title}</div>
-                    <div class="buffer">Includes ${event.bufferMinutes} min buffer</div>
-                </div>
-                <div class="time">
-                    ${formatTime(start)} - ${formatTime(end)}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
+// ===== IMAGE UPLOAD & OCR =====
+async function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-// Format time
-function formatTime(date) {
-    return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-    });
-}
-
-// Add to Google Calendar
-addToCalendarBtn.addEventListener('click', async () => {
-    if (!currentTask || !currentSchedule.length) return;
-
-    addToCalendarBtn.disabled = true;
-    addToCalendarBtn.textContent = '⏳ Adding to Calendar...';
+    showLoading();
 
     try {
-        const response = await fetch('/api/calendar/add-events', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                taskId: currentTask.id,
-                events: currentSchedule
-            })
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const response = await fetch("/ingest/image", {
+            method: "POST",
+            body: formData,
         });
 
         const data = await response.json();
-        
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to add events to calendar');
+
+        if (data.success && data.text) {
+            ocrResult.textContent = `📄 Extracted text: ${data.text}`;
+            ocrResult.classList.remove("hidden");
+            taskDescription.value = data.text;
+        } else {
+            alert("Failed to extract text from image");
         }
-
-        successMessage.classList.remove('hidden');
-        successMessage.scrollIntoView({ behavior: 'smooth' });
-
-        setTimeout(() => {
-            successMessage.classList.add('hidden');
-        }, 5000);
-
     } catch (error) {
-        alert('Error adding to calendar: ' + error.message);
+        console.error("OCR error:", error);
+        alert("Failed to process image");
     } finally {
-        addToCalendarBtn.disabled = false;
-        addToCalendarBtn.textContent = '📅 Add to Google Calendar';
+        hideLoading();
     }
-});
+}
 
-// Reset form
-resetBtn.addEventListener('click', () => {
-    taskForm.reset();
-    resultsSection.style.display = 'none';
-    manualSubtasks.classList.add('hidden');
-    ocrResult.classList.remove('show');
-    subtasksList.innerHTML = '';
-    successMessage.classList.add('hidden');
-    currentTask = null;
-    currentSubtasks = [];
-    currentSchedule = [];
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-});
+// ===== RENDER UNSCHEDULED TASKS =====
+function renderUnscheduledTasks() {
+    taskPool.innerHTML = "";
+    unscheduledTasks = currentSubtasks.filter(
+        (task) => !scheduledEvents.find((e) => e.subtaskId === task.id),
+    );
+
+    unscheduledTasks.forEach((task, index) => {
+        const taskCard = document.createElement("div");
+        taskCard.className = "task-card";
+        taskCard.draggable = true;
+        taskCard.dataset.taskId = index;
+        taskCard.dataset.duration = task.duration || 30;
+
+        taskCard.innerHTML = `
+      <div class="task-card-title">${task.title || task.description}</div>
+      <div class="task-card-duration">${task.duration || 30} min</div>
+    `;
+
+        // Drag events
+        taskCard.addEventListener("dragstart", handleDragStart);
+        taskCard.addEventListener("dragend", handleDragEnd);
+
+        taskPool.appendChild(taskCard);
+    });
+}
+
+// ===== DRAG AND DROP =====
+let draggedTask = null;
+
+function handleDragStart(e) {
+    draggedTask = e.target;
+    e.target.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/html", e.target.innerHTML);
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove("dragging");
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = "move";
+
+    const timeSlot = e.currentTarget;
+    if (!timeSlot.classList.contains("drop-zone")) {
+        timeSlot.classList.add("drop-zone");
+    }
+
+    return false;
+}
+
+function handleDragLeave(e) {
+    e.currentTarget.classList.remove("drop-zone");
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+
+    e.preventDefault();
+
+    const timeSlot = e.currentTarget;
+    timeSlot.classList.remove("drop-zone");
+
+    if (!draggedTask) return false;
+
+    const taskId = parseInt(draggedTask.dataset.taskId);
+    const task = unscheduledTasks[taskId];
+    const hour = parseInt(timeSlot.dataset.hour);
+
+    // Create scheduled event
+    const scheduledEvent = document.createElement("div");
+    scheduledEvent.className = "scheduled-event";
+    scheduledEvent.innerHTML = `
+    <div class="scheduled-event-title">${task.title || task.description}</div>
+    <div class="scheduled-event-time">${task.duration || 30} min</div>
+  `;
+
+    // Clear existing content and add event
+    timeSlot.innerHTML = "";
+    timeSlot.appendChild(scheduledEvent);
+
+    // Update schedule
+    scheduledEvents.push({
+        subtaskId: taskId,
+        task: task,
+        startTime: `${hour}:00`,
+        hour: hour,
+    });
+
+    // Remove from unscheduled
+    draggedTask.remove();
+    draggedTask = null;
+
+    return false;
+}
+
+// ===== VOICE MODE (STUB) =====
+function handleVoiceToggle() {
+    // Show voice indicator
+    voiceIndicator.classList.remove("hidden");
+
+    // Hide after 2 seconds (stub behavior)
+    setTimeout(() => {
+        voiceIndicator.classList.add("hidden");
+        alert(
+            "Voice mode coming soon! 🎤\nThis feature will allow you to speak your tasks and schedule them using AI.",
+        );
+    }, 2000);
+}
+
+// ===== CALENDAR SYNC =====
+async function syncToCalendar() {
+    if (scheduledEvents.length === 0) {
+        alert("Please schedule at least one task on the timeline first.");
+        return;
+    }
+
+    showLoading();
+
+    try {
+        // Build events array
+        const events = scheduledEvents.map((se) => {
+            const startHour = se.hour;
+            const duration = se.task.duration || 30;
+
+            return {
+                title: se.task.title || se.task.description,
+                description: se.task.description || "",
+                startTime: `${startHour}:00`,
+                duration: duration,
+                bufferMinutes: 10,
+            };
+        });
+
+        const response = await fetch("/agenda", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                taskTitle: currentTask.title,
+                events: events,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showSuccess();
+            setTimeout(() => hideSuccess(), 3000);
+        } else {
+            alert(
+                "Failed to sync to calendar: " +
+                    (data.error || "Unknown error"),
+            );
+        }
+    } catch (error) {
+        console.error("Calendar sync error:", error);
+        alert("Failed to sync with Google Calendar");
+    } finally {
+        hideLoading();
+    }
+}
+
+// ===== UI HELPERS =====
+function showLoading() {
+    loadingSpinner.classList.remove("hidden");
+}
+
+function hideLoading() {
+    loadingSpinner.classList.add("hidden");
+}
+
+function showSuccess() {
+    successMessage.classList.remove("hidden");
+}
+
+function hideSuccess() {
+    successMessage.classList.add("hidden");
+}
+
+// ===== UTILITY FUNCTIONS =====
+function formatTime(hour, minute = 0) {
+    const period = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`;
+}
